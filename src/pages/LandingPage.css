@@ -1,9 +1,11 @@
 .landing-container {
-  height: 100vh;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  position: relative;
+  justify-content: center;
+  min-height: 80vh; /* Reduced from 100vh if it existed, or added new */
+  padding-bottom: 5vh; /* Add some bottom padding to lift everything up */
+  gap: 1.5rem; /* Ensure consistent spacing between elements */
 }
 
 .logo-container {
@@ -11,6 +13,8 @@
   z-index: 1;
   opacity: 0;
   transform: scale(0.5);
+  margin-bottom: 2rem; /* Add space below logo */
+  transform: translateY(-40px); /* Lift the logo up */
 }
 
 .logo-container.animate {
@@ -34,6 +38,7 @@
   min-width: 200px; /* Added for consistent button sizes */
   text-align: center;
   background-color: #2563eb !important; /* Blue-600 */
+  transform: translateY(-40px); /* Lift the buttons up */
 }
 
 .animated-button:hover {

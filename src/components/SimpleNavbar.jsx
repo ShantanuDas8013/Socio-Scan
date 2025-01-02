@@ -6,7 +6,7 @@ const SimpleNavbar = () => {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="sticky top-0 z-50 py-3 backdrop-blur-2xl border-b bg-white/95 dark:bg-neutral-900/95 border-neutral-200/80 dark:border-neutral-700/80">
+    <nav className="sticky top-0 z-50 py-3 backdrop-blur-md bg-white/30 dark:bg-neutral-900/30 border-b border-neutral-200/50 dark:border-neutral-700/50">
       <div className="container px-4 mx-auto">
         <div className="flex justify-between items-center">
           <div className="flex items-center flex-shrink-0">
