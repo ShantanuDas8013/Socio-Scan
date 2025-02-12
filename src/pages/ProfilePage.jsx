@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useUser } from "../hooks/useUser";
-import { doc, updateDoc, deleteDoc } from "firebase/firestore"; // Add deleteDoc
-import { db } from "../firebase/firebase";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { db } from "../firebase/firebase"; // Removed storage import since we won't use it now
 import { toast } from "react-hot-toast";
-import { getAuth, deleteUser } from "firebase/auth"; // Add these imports
+import { getAuth, deleteUser } from "firebase/auth";
+import { FaCloudUploadAlt } from "react-icons/fa"; // Import cloud upload icon
 
 const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -17,6 +18,10 @@ const ProfilePage = () => {
   });
   const [imageUpload, setImageUpload] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [resumeUpload, setResumeUpload] = useState(null);
+  const [resumePreview, setResumePreview] = useState(null);
+  const [resumeFileName, setResumeFileName] = useState("");
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (userData) {
@@ -26,7 +31,9 @@ const ProfilePage = () => {
         age: userData.age || "",
         phone: userData.phone || "",
         bio: userData.bio || "",
+        resumeURL: userData.resumeURL || "",
       });
+      setResumePreview(userData.resumeURL || null);
     }
   }, [userData]);
 
@@ -38,7 +45,6 @@ const ProfilePage = () => {
     }));
   };
 
-  // Convert image file to base64
   const convertToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -68,39 +74,88 @@ const ProfilePage = () => {
     }
   };
 
-  // Update handleSubmit to properly handle photo updates
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (userData?.uid) {
+  // Updated resume handler: converts PDF to base64 and saves file name
+  const handleResumeChange = async (e) => {
+    const file = e.target.files[0];
+    if (file && file.type === "application/pdf") {
+      if (file.size > 2000000) {
+        // 2MB limit
+        toast.error("Resume size should be less than 2MB");
+        return;
+      }
+      try {
+        const base64 = await convertToBase64(file);
+        setResumeUpload(base64);
+        setResumePreview(base64);
+        setResumeFileName(file.name); // Save the file name
+      } catch (error) {
+        console.error("Error converting resume:", error);
+        toast.error("Failed to process resume file");
+      }
+    } else {
+      toast.error("Please upload a PDF file");
+    }
+  };
+
+  // Updated remove resume: clears resume data and file name
+  const handleRemoveResume = async () => {
+    if (window.confirm("Are you sure you want to remove your resume?")) {
       try {
         const userRef = doc(db, "users", userData.uid);
-        const updateData = {
-          fullName: userDetails.fullName,
-          phone: userDetails.phone || "",
-          age: userDetails.age || "",
-          bio: userDetails.bio || "",
-          photoURL: imageUpload || userData.photoURL, // Store base64 string directly
-          updatedAt: new Date().toISOString(),
-        };
-
-        await updateDoc(userRef, updateData);
-        setUserDetails((prev) => ({
-          ...prev,
-          ...updateData,
-        }));
-
-        setIsEditing(false);
-        setImageUpload(null);
-        setImagePreview(null);
-        toast.success("Profile updated successfully!");
+        await updateDoc(userRef, {
+          resumeURL: "",
+        });
+        setResumeUpload(null);
+        setResumePreview(null);
+        setResumeFileName(""); // Clear the saved file name
+        toast.success("Resume removed successfully!");
       } catch (error) {
-        console.error("Error updating profile:", error);
-        toast.error("Failed to update profile");
+        console.error("Error removing resume:", error);
+        toast.error("Failed to remove resume");
       }
     }
   };
 
-  // Add this function to handle cancel
+  // Updated handleSubmit to save resume as base64 in Firestore
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!userData || !userData.uid) {
+      toast.error("User data not loaded");
+      return;
+    }
+    try {
+      const userRef = doc(db, "users", userData.uid);
+      // Use base64 string if new resume file exists, otherwise keep existing field
+      const resumeURL = resumeUpload ? resumeUpload : userData.resumeURL || "";
+
+      const updateData = {
+        fullName: userDetails.fullName,
+        phone: userDetails.phone || "",
+        age: userDetails.age || "",
+        bio: userDetails.bio || "",
+        photoURL: imageUpload || userData.photoURL,
+        resumeURL, // Updated resume data (base64 or empty)
+        updatedAt: new Date().toISOString(),
+      };
+
+      console.log("Updating user document with data:", updateData);
+      await updateDoc(userRef, updateData);
+      setUserDetails((prev) => ({
+        ...prev,
+        ...updateData,
+      }));
+      setIsEditing(false);
+      setImageUpload(null);
+      setImagePreview(null);
+      setResumeUpload(null);
+      setResumePreview(resumeURL);
+      toast.success("Profile updated successfully!");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile");
+    }
+  };
+
   const handleCancel = () => {
     if (window.confirm("Do you want to cancel changes?")) {
       // Reset form data to original user data
@@ -147,6 +202,20 @@ const ProfilePage = () => {
         );
       }
     }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    handleResumeChange({ target: { files: [file] } });
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
   };
 
   if (loading) {
@@ -243,6 +312,50 @@ const ProfilePage = () => {
                   className="bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white p-2 rounded mb-2 w-full transition-colors"
                   rows="3"
                 />
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Upload Resume (PDF)
+                  </label>
+                  <div
+                    className="mt-1 flex items-center justify-center p-6 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    onClick={handleUploadClick}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                  >
+                    <FaCloudUploadAlt className="text-3xl text-gray-400 dark:text-gray-500" />
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleResumeChange}
+                      className="hidden"
+                      ref={fileInputRef}
+                    />
+                    <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
+                      {resumeFileName
+                        ? resumeFileName
+                        : "Drag & drop your resume here, or click to select a file"}
+                    </span>
+                  </div>
+                  {resumePreview && (
+                    <div className="mt-2 flex items-center">
+                      <a
+                        href={resumePreview}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:underline"
+                      >
+                        View Resume
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleRemoveResume}
+                        className="ml-4 text-red-500 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="submit"

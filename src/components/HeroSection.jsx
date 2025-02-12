@@ -8,7 +8,7 @@ const HeroSection = () => {
         Socio-Scan
         <span className="bg-gradient-to-r from-orange-500 to-red-800 text-transparent bg-clip-text">
           {" "}
-          for Recruiters
+          for Applicants
         </span>
       </h1>
       <p className="mt-10 text-lg text-center dark:text-neutral-500 text-neutral-600 max-w-4xl">
