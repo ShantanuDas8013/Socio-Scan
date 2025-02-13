@@ -5,6 +5,8 @@ import { db } from "../firebase/firebase"; // Removed storage import since we wo
 import { toast } from "react-hot-toast";
 import { getAuth, deleteUser } from "firebase/auth";
 import { FaCloudUploadAlt } from "react-icons/fa"; // Import cloud upload icon
+import { uploadFile, deleteFile } from "../aws/s3";
+import { generateSignedUrl } from "../aws/generateSignedUrl";
 
 const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -21,6 +23,7 @@ const ProfilePage = () => {
   const [resumeUpload, setResumeUpload] = useState(null);
   const [resumePreview, setResumePreview] = useState(null);
   const [resumeFileName, setResumeFileName] = useState("");
+  const [signedResumeUrl, setSignedResumeUrl] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -34,8 +37,28 @@ const ProfilePage = () => {
         resumeURL: userData.resumeURL || "",
       });
       setResumePreview(userData.resumeURL || null);
+      // If a resumeURL is present but file name is not saved, extract it from the URL
+      if (userData.resumeURL && !resumeFileName) {
+        const extractedName = userData.resumeURL.split("/").pop();
+        setResumeFileName(extractedName);
+      }
     }
   }, [userData]);
+
+  useEffect(() => {
+    const updateSignedUrl = async () => {
+      if (resumePreview && resumeFileName) {
+        try {
+          const url = await generateSignedUrl(resumePreview, resumeFileName);
+          setSignedResumeUrl(url);
+        } catch (error) {
+          console.error("Error generating signed URL", error);
+          setSignedResumeUrl(resumePreview);
+        }
+      }
+    };
+    updateSignedUrl();
+  }, [resumePreview, resumeFileName]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -74,33 +97,37 @@ const ProfilePage = () => {
     }
   };
 
-  // Updated resume handler: converts PDF to base64 and saves file name
+  // Updated resume handler: adds debugging logs to ensure PDF upload works
   const handleResumeChange = async (e) => {
     const file = e.target.files[0];
     if (file && file.type === "application/pdf") {
       if (file.size > 2000000) {
-        // 2MB limit
         toast.error("Resume size should be less than 2MB");
         return;
       }
+      console.log("PDF file selected:", file);
       try {
-        const base64 = await convertToBase64(file);
-        setResumeUpload(base64);
-        setResumePreview(base64);
+        const s3Url = await uploadFile(file);
+        console.log("Received S3 URL:", s3Url);
+        setResumePreview(s3Url);
+        setResumeUpload(s3Url); // Save S3 URL for Firestore update
         setResumeFileName(file.name); // Save the file name
       } catch (error) {
-        console.error("Error converting resume:", error);
-        toast.error("Failed to process resume file");
+        console.error("Error uploading resume:", error);
+        toast.error("Failed to upload resume");
       }
     } else {
       toast.error("Please upload a PDF file");
     }
   };
 
-  // Updated remove resume: clears resume data and file name
+  // Updated remove resume handler: also calls deleteFile to remove resume from S3
   const handleRemoveResume = async () => {
     if (window.confirm("Are you sure you want to remove your resume?")) {
       try {
+        if (resumePreview) {
+          await deleteFile(resumePreview);
+        }
         const userRef = doc(db, "users", userData.uid);
         await updateDoc(userRef, {
           resumeURL: "",
@@ -116,16 +143,16 @@ const ProfilePage = () => {
     }
   };
 
-  // Updated handleSubmit to save resume as base64 in Firestore
+  // Updated handleSubmit: logs the resumeUpload value before updating Firestore
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!userData || !userData.uid) {
       toast.error("User data not loaded");
       return;
     }
+    console.log("Resume to update:", resumeUpload);
     try {
       const userRef = doc(db, "users", userData.uid);
-      // Use base64 string if new resume file exists, otherwise keep existing field
       const resumeURL = resumeUpload ? resumeUpload : userData.resumeURL || "";
 
       const updateData = {
@@ -134,7 +161,7 @@ const ProfilePage = () => {
         age: userDetails.age || "",
         bio: userDetails.bio || "",
         photoURL: imageUpload || userData.photoURL,
-        resumeURL, // Updated resume data (base64 or empty)
+        resumeURL, // S3 URL linked to the user document in Firestore
         updatedAt: new Date().toISOString(),
       };
 
@@ -217,6 +244,13 @@ const ProfilePage = () => {
   const handleDragOver = (e) => {
     e.preventDefault();
   };
+
+  // Compute resume view URL with inline disposition if resumePreview exists
+  const resumeViewUrl = resumePreview
+    ? `${resumePreview}?response-content-disposition=${encodeURIComponent(
+        `inline; filename="${resumeFileName}"`
+      )}`
+    : null;
 
   if (loading) {
     return (
@@ -339,7 +373,7 @@ const ProfilePage = () => {
                   {resumePreview && (
                     <div className="mt-2 flex items-center">
                       <a
-                        href={resumePreview}
+                        href={signedResumeUrl || resumePreview}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-500 hover:underline"
