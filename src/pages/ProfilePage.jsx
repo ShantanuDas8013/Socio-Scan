@@ -5,8 +5,7 @@ import { db } from "../firebase/firebase"; // Removed storage import since we wo
 import { toast } from "react-hot-toast";
 import { getAuth, deleteUser } from "firebase/auth";
 import { FaCloudUploadAlt } from "react-icons/fa"; // Import cloud upload icon
-import { uploadFile, deleteFile } from "../aws/s3";
-import { generateSignedUrl } from "../aws/generateSignedUrl";
+import { uploadFile, deleteFile, getPresignedUrl } from "../aws/s3";
 
 const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -23,8 +22,11 @@ const ProfilePage = () => {
   const [resumeUpload, setResumeUpload] = useState(null);
   const [resumePreview, setResumePreview] = useState(null);
   const [resumeFileName, setResumeFileName] = useState("");
-  const [signedResumeUrl, setSignedResumeUrl] = useState(null);
+  const [presignedUrl, setPresignedUrl] = useState(null);
+  const [resumeFile, setResumeFile] = useState(null); // Add state to store the file
   const fileInputRef = useRef(null);
+
+  const bucketName = "socio-scan1"; // Replace with your S3 bucket name
 
   useEffect(() => {
     if (userData) {
@@ -46,19 +48,22 @@ const ProfilePage = () => {
   }, [userData]);
 
   useEffect(() => {
-    const updateSignedUrl = async () => {
-      if (resumePreview && resumeFileName) {
+    const generatePresignedUrl = async () => {
+      if (resumePreview) {
         try {
-          const url = await generateSignedUrl(resumePreview, resumeFileName);
-          setSignedResumeUrl(url);
+          // Extract the key from the S3 URL
+          const key = resumePreview.split(".com/").pop();
+          const url = await getPresignedUrl(bucketName, key);
+          setPresignedUrl(url);
         } catch (error) {
-          console.error("Error generating signed URL", error);
-          setSignedResumeUrl(resumePreview);
+          console.error("Error getting presigned URL:", error);
+          toast.error("Failed to generate secure access link for resume");
         }
       }
     };
-    updateSignedUrl();
-  }, [resumePreview, resumeFileName]);
+
+    generatePresignedUrl();
+  }, [resumePreview]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -97,8 +102,8 @@ const ProfilePage = () => {
     }
   };
 
-  // Updated resume handler: adds debugging logs to ensure PDF upload works
-  const handleResumeChange = async (e) => {
+  // Updated resume handler: only sets the file without uploading
+  const handleResumeChange = (e) => {
     const file = e.target.files[0];
     if (file && file.type === "application/pdf") {
       if (file.size > 2000000) {
@@ -106,16 +111,8 @@ const ProfilePage = () => {
         return;
       }
       console.log("PDF file selected:", file);
-      try {
-        const s3Url = await uploadFile(file);
-        console.log("Received S3 URL:", s3Url);
-        setResumePreview(s3Url);
-        setResumeUpload(s3Url); // Save S3 URL for Firestore update
-        setResumeFileName(file.name); // Save the file name
-      } catch (error) {
-        console.error("Error uploading resume:", error);
-        toast.error("Failed to upload resume");
-      }
+      setResumeFile(file); // Set the file to state
+      setResumeFileName(file.name); // Save the file name
     } else {
       toast.error("Please upload a PDF file");
     }
@@ -143,18 +140,22 @@ const ProfilePage = () => {
     }
   };
 
-  // Updated handleSubmit: logs the resumeUpload value before updating Firestore
+  // Updated handleSubmit: uploads the file to S3 before updating Firestore
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!userData || !userData.uid) {
       toast.error("User data not loaded");
       return;
     }
-    console.log("Resume to update:", resumeUpload);
+    console.log("Resume to update:", resumeFile);
     try {
-      const userRef = doc(db, "users", userData.uid);
-      const resumeURL = resumeUpload ? resumeUpload : userData.resumeURL || "";
+      let resumeURL = userData.resumeURL || "";
+      if (resumeFile) {
+        resumeURL = await uploadFile(resumeFile); // Upload the file to S3
+        console.log("Received S3 URL:", resumeURL);
+      }
 
+      const userRef = doc(db, "users", userData.uid);
       const updateData = {
         fullName: userDetails.fullName,
         phone: userDetails.phone || "",
@@ -174,7 +175,7 @@ const ProfilePage = () => {
       setIsEditing(false);
       setImageUpload(null);
       setImagePreview(null);
-      setResumeUpload(null);
+      setResumeFile(null); // Clear the file state
       setResumePreview(resumeURL);
       toast.success("Profile updated successfully!");
     } catch (error) {
@@ -246,11 +247,7 @@ const ProfilePage = () => {
   };
 
   // Compute resume view URL with inline disposition if resumePreview exists
-  const resumeViewUrl = resumePreview
-    ? `${resumePreview}?response-content-disposition=${encodeURIComponent(
-        `inline; filename="${resumeFileName}"`
-      )}`
-    : null;
+  const resumeViewUrl = presignedUrl || resumePreview;
 
   if (loading) {
     return (
@@ -373,10 +370,17 @@ const ProfilePage = () => {
                   {resumePreview && (
                     <div className="mt-2 flex items-center">
                       <a
-                        href={signedResumeUrl || resumePreview}
+                        href={resumeViewUrl} // Changed to use resumeViewUrl
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-500 hover:underline"
+                        onClick={(e) => {
+                          if (!presignedUrl) {
+                            e.preventDefault();
+                            toast.error("Generating secure access link...");
+                            generatePresignedUrl();
+                          }
+                        }}
                       >
                         View Resume
                       </a>

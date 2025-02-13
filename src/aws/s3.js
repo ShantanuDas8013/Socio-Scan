@@ -1,11 +1,18 @@
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3Client = new S3Client({
   region: "ap-south-1", // updated region
+  endpoint: "https://s3.ap-south-1.amazonaws.com", // specify the correct endpoint
   credentials: {
-    accessKeyId: "AKIA3CMCCDJWBG3JQ43S",
-    secretAccessKey: "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",
+    accessKeyId: "AKIA3CMCCDJWLV2BUTV3",
+    secretAccessKey: "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",
   },
 });
 
@@ -41,7 +48,7 @@ export const uploadFile = async (file) => {
       params: uploadParams,
     });
     await parallelUpload.done();
-    return `https://socio-scan1.s3.amazonaws.com/${fileName}`;
+    return `https://socio-scan1.s3.ap-south-1.amazonaws.com/${fileName}`;
   } catch (error) {
     console.error("S3 Upload error:", error);
     throw error;
@@ -62,6 +69,25 @@ export const deleteFile = async (fileUrl) => {
     console.log("File deleted from S3:", key);
   } catch (error) {
     console.error("S3 Delete error:", error);
+    throw error;
+  }
+};
+
+// Function to generate pre-signed URL
+export const getPresignedUrl = async (bucketName, key) => {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+
+    // Generate URL that expires in 1 hour
+    const signedUrl = await getSignedUrl(s3Client, command, {
+      expiresIn: 3600,
+    });
+    return signedUrl;
+  } catch (error) {
+    console.error("Error generating presigned URL:", error);
     throw error;
   }
 };
