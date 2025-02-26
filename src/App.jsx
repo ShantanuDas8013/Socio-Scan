@@ -6,23 +6,23 @@ import {
 } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import HeroSection from "./components/HeroSection";
-import FeatureSection from "./components/FeatureSection";
 import Workflow from "./components/Workflow";
+import Testimonials from "./components/Testimonials";
 import Footer from "./components/Footer";
 import Pricing from "./components/Pricing";
-import Testimonials from "./components/Testimonials";
+import FeatureSection from "./components/FeatureSection";
 import ProfilePage from "./pages/ProfilePage";
 import LandingPage from "./pages/LandingPage";
 import SettingsPage from "./pages/SettingsPage";
 import ApplicantLogin from "./pages/ApplicantLogin";
 import ApplicantSignup from "./pages/ApplicantSignup";
 import { ThemeProvider } from "./context/ThemeContext";
+import { AuthProvider } from "./context/AuthContext";
 
 const Home = () => {
   return (
     <>
       <HeroSection />
-      <FeatureSection />
       <Workflow />
       <Pricing />
       <Testimonials />
@@ -79,11 +79,13 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <ThemeProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </ThemeProvider>
+    <Router>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ThemeProvider>
+    </Router>
   );
 };
 export default App;

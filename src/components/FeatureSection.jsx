@@ -10,7 +10,7 @@ const FeatureSection = () => {
         <h2 className="text-3xl sm:text-5xl lg:text-6xl mt-10 lg:mt-20 tracking-wide">
           Easily Analyze{" "}
           <span className="bg-gradient-to-r from-orange-500 to-orange-800 text-transparent bg-clip-text">
-            Social Media Presence
+            Applicant Resume
           </span>
         </h2>
       </div>

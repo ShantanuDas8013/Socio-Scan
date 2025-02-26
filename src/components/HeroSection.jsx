@@ -12,7 +12,7 @@ const HeroSection = () => {
         </span>
       </h1>
       <p className="mt-10 text-lg text-center dark:text-neutral-500 text-neutral-600 max-w-4xl">
-        Fast, Ethical Social Media screening for hiring decisions
+        Fast, Ethical Resume screening for hiring decisions
       </p>
       <div className="flex justify-center my-10">
         <a

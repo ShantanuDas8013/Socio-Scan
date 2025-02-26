@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useUser } from "../hooks/useUser";
+import ResumeAnalysisDialog from "../components/ResumeAnalysisDialog";
+import PaymentPage from "../components/PaymentPage";
 
 const SettingsPage = () => {
   const { userData, loading } = useUser();
   const [activeTab, setActiveTab] = useState("subscription");
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [showPayment, setShowPayment] = useState(false);
 
   // Initialize account settings with empty values
   const [accountSettings, setAccountSettings] = useState({
@@ -109,10 +113,12 @@ const SettingsPage = () => {
     },
   });
 
+  // Update the plans array to mark Basic as default
   const plans = [
     {
       name: "Basic",
-      price: "$9.99/mo",
+      price: "$9.99",
+      isDefault: true,
       features: [
         "Basic scan features",
         "Weekly reports",
@@ -121,7 +127,8 @@ const SettingsPage = () => {
     },
     {
       name: "Pro",
-      price: "$29.99/mo",
+      price: "$29.99",
+      isDefault: false,
       features: [
         "Advanced scanning",
         "Daily reports",
@@ -132,6 +139,7 @@ const SettingsPage = () => {
     {
       name: "Enterprise",
       price: "Custom",
+      isDefault: false,
       features: [
         "Custom solutions",
         "24/7 support",
@@ -141,140 +149,221 @@ const SettingsPage = () => {
     },
   ];
 
-  // Render loading state while fetching user data
-  if (loading) {
-    return (
-      <div className="container mx-auto p-4">
-        <div className="animate-pulse">
-          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-          <div className="bg-white dark:bg-neutral-900 p-4 rounded-lg shadow-lg">
-            <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-            <div className="space-y-3">
-              <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
-              <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+  const handlePlanSwitch = (plan) => {
+    setSelectedPlan(plan);
+    setShowPayment(true);
+  };
+
+  // State for resume analysis
+  const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
+  const [resumeAnalysis, setResumeAnalysis] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Extract resume file name at the top level
+  const resumeFileName = userData?.resumeURL
+    ? userData.resumeURL.split("/").pop()
+    : null;
+
+  const handleScanResume = async () => {
+    if (!resumeFileName) return;
+    setIsAnalyzing(true);
+
+    try {
+      // Fetch the resume file as Blob (adjust based on your file storage)
+      const responseFile = await fetch(userData.resumeURL);
+      const blob = await responseFile.blob();
+      const formData = new FormData();
+      formData.append("resume", blob, resumeFileName);
+
+      // Update the API endpoint port to 8000
+      const response = await fetch("http://localhost:8000/scan_resume", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      setResumeAnalysis({
+        professionalismScore: Math.round(result.overallScore),
+        education: result.categoryScores["Education"] > 50,
+        projects: result.categoryScores["Projects"] > 50,
+        workExperience: result.categoryScores["Work Experience"] > 50,
+        skills: result.categoryScores["Technical Skills"] > 50,
+        achievements: result.categoryScores["Achievements"] > 50,
+      });
+
+      setIsResumeDialogOpen(true);
+    } catch (error) {
+      console.error("Error scanning resume:", error);
+    }
+    setIsAnalyzing(false);
+  };
+
+  const renderSubscriptionContent = () => (
+    <div className="space-y-8">
+      <div className="grid md:grid-cols-3 gap-6">
+        {plans.map((plan) => (
+          <div
+            key={plan.name}
+            className={`relative overflow-hidden rounded-2xl transition-all duration-300 hover:shadow-xl ${
+              plan.isDefault
+                ? "border-2 border-orange-500 bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/20 dark:to-neutral-900"
+                : "border border-neutral-200 dark:border-neutral-700 hover:border-orange-500 dark:hover:border-orange-500"
+            }`}
+          >
+            {plan.isDefault && (
+              <div className="absolute top-4 right-4">
+                <span className="px-3 py-1 text-xs font-medium text-white bg-orange-500 rounded-full">
+                  Current Plan
+                </span>
+              </div>
+            )}
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white">
+                {plan.name}
+              </h3>
+              <div className="mt-4 flex items-baseline">
+                <span className="text-3xl font-bold text-orange-500">
+                  {plan.price}
+                </span>
+                <span className="ml-1 text-neutral-600 dark:text-neutral-400">
+                  /mo
+                </span>
+              </div>
+              <ul className="mt-6 space-y-3">
+                {plan.features.map((feature, index) => (
+                  <li
+                    key={index}
+                    className="flex items-center text-neutral-600 dark:text-neutral-400"
+                  >
+                    <svg
+                      className="w-5 h-5 text-orange-500 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <button
+                className={`mt-8 w-full py-3 px-4 rounded-xl font-medium transition-all duration-300 ${
+                  plan.isDefault
+                    ? "bg-neutral-200 text-neutral-600 cursor-not-allowed"
+                    : "bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-orange-500/25"
+                }`}
+                onClick={() => !plan.isDefault && handlePlanSwitch(plan)}
+                disabled={plan.isDefault}
+              >
+                {plan.isDefault ? "Current Plan" : `Upgrade to ${plan.name}`}
+              </button>
             </div>
           </div>
-        </div>
+        ))}
       </div>
-    );
-  }
+    </div>
+  );
 
   const renderScanSettings = () => (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-white">
-        Scan Preferences
-      </h2>
-
-      {/* Scan Frequency Section */}
-      <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
-        <h3 className="text-lg font-medium mb-4 text-neutral-900 dark:text-white">
-          Profile Scan Frequency
-        </h3>
-        <select
-          className="w-full p-2 border border-neutral-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-800"
-          value={scanPreferences.frequency.type}
-          onChange={(e) =>
-            setScanPreferences({
-              ...scanPreferences,
-              frequency: { ...scanPreferences.frequency, type: e.target.value },
-            })
-          }
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200 dark:border-neutral-700 transition-all duration-300 hover:shadow-lg">
+        <h2 className="text-xl font-bold mb-6 text-neutral-900 dark:text-white flex items-center">
+          <svg
+            className="w-6 h-6 mr-2 text-orange-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          Resume Scan
+        </h2>
+        <div className="mb-4 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
+          <p className="text-neutral-600 dark:text-neutral-400">
+            {resumeFileName ? resumeFileName : "No resume uploaded"}
+          </p>
+        </div>
+        <button
+          className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center ${
+            !resumeFileName
+              ? "bg-neutral-200 text-neutral-600 cursor-not-allowed"
+              : "bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-orange-500/25"
+          }`}
+          disabled={!resumeFileName || isAnalyzing}
+          onClick={handleScanResume}
         >
-          <option value="realtime">Real-time Scans</option>
-          <option value="daily">Daily Scans</option>
-          <option value="weekly">Weekly Scans</option>
-          <option value="monthly">Monthly Scans</option>
-          <option value="manual">Manual Scan</option>
-        </select>
+          {isAnalyzing ? (
+            <>
+              <svg
+                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              Scanning...
+            </>
+          ) : (
+            "Scan Resume"
+          )}
+        </button>
       </div>
 
-      {/* Keywords Section */}
-      <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
-        <h3 className="text-lg font-medium mb-4 text-neutral-900 dark:text-white">
-          Keywords & Filters
+      {/* Scan Preferences Section */}
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 border border-neutral-200 dark:border-neutral-700 transition-all duration-300 hover:shadow-lg">
+        <h3 className="text-lg font-bold mb-6 text-neutral-900 dark:text-white">
+          Scan Preferences
         </h3>
         <div className="space-y-4">
-          <input
-            type="text"
-            placeholder="Add keywords (comma separated)"
-            className="w-full p-2 border border-neutral-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-800"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const newKeywords = e.target.value
-                  .split(",")
-                  .map((k) => k.trim());
+          <div className="group">
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Scan Frequency
+            </label>
+            <select
+              className="w-full p-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-300"
+              value={scanPreferences.frequency.type}
+              onChange={(e) =>
                 setScanPreferences({
                   ...scanPreferences,
-                  keywords: {
-                    ...scanPreferences.keywords,
-                    included: [
-                      ...scanPreferences.keywords.included,
-                      ...newKeywords,
-                    ],
+                  frequency: {
+                    ...scanPreferences.frequency,
+                    type: e.target.value,
                   },
-                });
-                e.target.value = "";
+                })
               }
-            }}
-          />
-          <div className="flex flex-wrap gap-2">
-            {scanPreferences.keywords.included.map((keyword, index) => (
-              <span
-                key={index}
-                className="bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-100 px-3 py-1 rounded-full text-sm"
-              >
-                {keyword}
-                <button
-                  onClick={() => {
-                    setScanPreferences({
-                      ...scanPreferences,
-                      keywords: {
-                        ...scanPreferences.keywords,
-                        included: scanPreferences.keywords.included.filter(
-                          (_, i) => i !== index
-                        ),
-                      },
-                    });
-                  }}
-                  className="ml-2 text-orange-600 dark:text-orange-300"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
+            >
+              <option value="realtime">Real-time Scans</option>
+              <option value="daily">Daily Scans</option>
+              <option value="weekly">Weekly Scans</option>
+              <option value="monthly">Monthly Scans</option>
+              <option value="manual">Manual Scan</option>
+            </select>
           </div>
         </div>
       </div>
-
-      {/* Exclusion Rules Section */}
-      <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
-        <h3 className="text-lg font-medium mb-4 text-neutral-900 dark:text-white">
-          Exclusion Rules
-        </h3>
-        <select
-          className="w-full p-2 border border-neutral-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-800"
-          value={scanPreferences.exclusionRules.timeLimit}
-          onChange={(e) =>
-            setScanPreferences({
-              ...scanPreferences,
-              exclusionRules: {
-                ...scanPreferences.exclusionRules,
-                timeLimit: e.target.value,
-              },
-            })
-          }
-        >
-          <option value="1_week">Ignore posts older than 1 week</option>
-          <option value="1_month">Ignore posts older than 1 month</option>
-          <option value="6_months">Ignore posts older than 6 months</option>
-          <option value="custom">Custom range</option>
-        </select>
-      </div>
-
-      {/* Save Preferences Button */}
-      <button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-md transition-colors">
-        Save Scan Preferences
-      </button>
     </div>
   );
 
@@ -342,7 +431,6 @@ const SettingsPage = () => {
           <option value="restricted">Restricted</option>
           <option value="private">Private</option>
         </select>
-
         <div className="flex items-center mb-4">
           <input
             type="checkbox"
@@ -405,138 +493,126 @@ const SettingsPage = () => {
   );
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6 text-neutral-900 dark:text-white">
-        Settings
-      </h1>
-
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Settings Navigation */}
-        <div className="w-full md:w-64 flex-shrink-0">
-          <div className="bg-white dark:bg-neutral-900 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
-            <nav className="space-y-2">
-              {[
-                "subscription",
-                "scan",
-                "privacy",
-                "integration",
-                "support",
-              ].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`w-full text-left px-4 py-2 rounded text-neutral-900 dark:text-white ${
-                    activeTab === tab
-                      ? "bg-orange-500 text-white"
-                      : "hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                  }`}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
-            </nav>
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      <div className="container mx-auto px-4 py-8">
+        {loading ? (
+          <div className="animate-pulse">
+            <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+            <div className="bg-white dark:bg-neutral-900 p-4 rounded-lg shadow-lg">
+              <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+              <div className="space-y-3">
+                <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Settings Content */}
-        <div className="flex-1">
-          <div className="bg-white dark:bg-neutral-900 rounded-lg p-6 border border-neutral-200 dark:border-neutral-700">
-            {activeTab === "subscription" && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-white">
-                  Subscription Plans
-                </h2>
-
-                {/* Current Plan */}
-                <div className="mb-6 p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2 text-neutral-900 dark:text-white">
-                    Current Plan: Pro
-                  </h3>
-                  <p className="text-neutral-600 dark:text-gray-400">
-                    Next billing date: January 1, 2024
-                  </p>
-                </div>
-
-                {/* Available Plans */}
-                <div className="grid md:grid-cols-3 gap-4 mb-6">
-                  {plans.map((plan) => (
-                    <div
-                      key={plan.name}
-                      className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 bg-neutral-50 dark:bg-neutral-800"
-                    >
-                      <h3 className="text-lg font-medium mb-2 text-neutral-900 dark:text-white">
-                        {plan.name}
-                      </h3>
-                      <p className="text-xl text-orange-500 mb-4">
-                        {plan.price}
-                      </p>
-                      <ul className="text-neutral-600 dark:text-gray-400 space-y-2">
-                        {plan.features.map((feature, index) => (
-                          <li key={index}>• {feature}</li>
-                        ))}
-                      </ul>
-                      <button className="mt-4 w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-md transition-colors">
-                        {plan.name === "Pro"
-                          ? "Current Plan"
-                          : `Switch to ${plan.name}`}
+        ) : (
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-3xl font-bold mb-8 text-neutral-900 dark:text-white">
+              Settings
+            </h1>
+            <div className="flex flex-col lg:flex-row gap-8">
+              {/* Settings Navigation - Updated with modern styling */}
+              <div className="w-full lg:w-64 flex-shrink-0">
+                <nav className="sticky top-8 bg-white dark:bg-neutral-900 rounded-2xl p-4 border border-neutral-200 dark:border-neutral-700 shadow-sm">
+                  <nav className="space-y-2">
+                    {[
+                      "subscription",
+                      "scan",
+                      "privacy",
+                      "integration",
+                      "support",
+                    ].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`w-full text-left px-4 py-2 rounded text-neutral-900 dark:text-white ${
+                          activeTab === tab
+                            ? "bg-orange-500 text-white"
+                            : "hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                        }`}
+                      >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
                       </button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </nav>
+                </nav>
+              </div>
 
-                {/* Payment Methods */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-medium mb-4 text-neutral-900 dark:text-white">
-                    Payment Methods
-                  </h3>
-                  <button className="bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 px-4 py-2 rounded-md transition-colors">
-                    Add Payment Method
-                  </button>
-                </div>
+              {/* Settings Content */}
+              <div className="flex-1">
+                <div className="bg-transparent">
+                  {activeTab === "subscription" && renderSubscriptionContent()}
 
-                {/* Billing History */}
-                <div>
-                  <h3 className="text-lg font-medium mb-4 text-neutral-900 dark:text-white">
-                    Billing History
-                  </h3>
-                  <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                    <div className="p-4 border-b border-neutral-200 dark:border-neutral-700">
-                      <p className="font-medium text-neutral-900 dark:text-white">
-                        December 2023
-                      </p>
-                      <p className="text-neutral-600 dark:text-gray-400">
-                        Pro Plan - $29.99
-                      </p>
-                    </div>
-                    <div className="p-4">
-                      <p className="font-medium text-neutral-900 dark:text-white">
-                        November 2023
-                      </p>
-                      <p className="text-neutral-600 dark:text-gray-400">
-                        Pro Plan - $29.99
-                      </p>
-                    </div>
-                  </div>
+                  {activeTab === "scan" && renderScanSettings()}
+
+                  {activeTab === "privacy" && renderPrivacySettings()}
+
+                  {/* Placeholder for other tabs */}
+                  {activeTab !== "subscription" &&
+                    activeTab !== "scan" &&
+                    activeTab !== "privacy" && (
+                      <div className="text-center text-neutral-600 dark:text-gray-400 py-8">
+                        {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}{" "}
+                        settings coming soon...
+                      </div>
+                    )}
                 </div>
               </div>
-            )}
-
-            {activeTab === "scan" && renderScanSettings()}
-
-            {activeTab === "privacy" && renderPrivacySettings()}
-
-            {/* Placeholder for other tabs */}
-            {activeTab !== "subscription" &&
-              activeTab !== "scan" &&
-              activeTab !== "privacy" && (
-                <div className="text-center text-neutral-600 dark:text-gray-400 py-8">
-                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}{" "}
-                  settings coming soon...
-                </div>
-              )}
+            </div>
           </div>
-        </div>
+        )}
+        <ResumeAnalysisDialog
+          isOpen={isResumeDialogOpen}
+          onClose={() => setIsResumeDialogOpen(false)}
+          result={resumeAnalysis}
+          loading={isAnalyzing}
+        />
+        {/* New Resume Analysis Report */}
+        {resumeAnalysis && (
+          <div className="border border-gray-300 p-4 rounded-md mt-4">
+            <h2 className="text-xl font-semibold">Resume Analysis Report</h2>
+            <p>
+              Professionalism Score:{" "}
+              <strong>{resumeAnalysis.professionalismScore}%</strong>
+            </p>
+            {resumeAnalysis.professionalismScore < 20 ? (
+              <p className="text-red-500">
+                This file does not appear to be a resume. Please upload a valid
+                resume document.
+              </p>
+            ) : (
+              <>
+                <p>
+                  <strong>Education:</strong>{" "}
+                  {resumeAnalysis.education ? "✔️ Present" : "❌ Missing"}
+                </p>
+                <p>
+                  <strong>Projects:</strong>{" "}
+                  {resumeAnalysis.projects ? "✔️ Present" : "❌ Missing"}
+                </p>
+                <p>
+                  <strong>Work Experience:</strong>{" "}
+                  {resumeAnalysis.workExperience ? "✔️ Present" : "❌ Missing"}
+                </p>
+                <p>
+                  <strong>Skills:</strong>{" "}
+                  {resumeAnalysis.skills ? "✔️ Present" : "❌ Missing"}
+                </p>
+                <p>
+                  <strong>Achievements:</strong>{" "}
+                  {resumeAnalysis.achievements ? "✔️ Present" : "❌ Missing"}
+                </p>
+              </>
+            )}
+          </div>
+        )}
       </div>
+      <PaymentPage
+        isOpen={showPayment}
+        onClose={() => setShowPayment(false)}
+        selectedPlan={selectedPlan}
+      />
     </div>
   );
 };
