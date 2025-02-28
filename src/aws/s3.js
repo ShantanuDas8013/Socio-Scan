@@ -57,16 +57,17 @@ export const uploadFile = async (file) => {
 
 // New function to delete file from S3 using its URL
 export const deleteFile = async (fileUrl) => {
-  // Parse the file key from the URL (assuming standard S3 URL format)
-  const key = fileUrl.split("/").pop();
-  const params = {
-    Bucket: "socio-scan1",
-    Key: key,
-  };
   try {
-    const command = new DeleteObjectCommand(params);
+    // Extract the key from the S3 URL
+    const key = fileUrl.split(".com/").pop();
+
+    const command = new DeleteObjectCommand({
+      Bucket: "socio-scan1",
+      Key: key,
+    });
+
     await s3Client.send(command);
-    console.log("File deleted from S3:", key);
+    return true;
   } catch (error) {
     console.error("S3 Delete error:", error);
     throw error;

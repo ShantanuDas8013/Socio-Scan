@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Dialog } from "@headlessui/react";
 import { toast } from "react-hot-toast";
 
@@ -13,30 +13,31 @@ const PlanSwitcher = ({
   const [selectedPlan, setSelectedPlan] = useState(null);
   const cancelButtonRef = useRef(null);
 
-  const getButtonText = (planName) => {
-    const purchasedPlan = purchasedPlans.find((p) => p.plan === planName);
-
-    if (currentPlan === planName) return "Current Plan";
-    if (purchasedPlan) {
-      const endDate = new Date(purchasedPlan.endDate);
-      if (endDate > new Date()) {
-        return `Switch to ${planName}`;
-      }
-    }
-    return `Get ${planName}`;
+  const isPlanPurchased = (planName) => {
+    return purchasedPlans.some(
+      (plan) => plan.plan === planName && new Date(plan.endDate) > new Date()
+    );
   };
 
-  const handlePlanSwitch = async (plan) => {
+  const getButtonText = (planName) => {
+    if (currentPlan === planName) {
+      return "Current Plan";
+    }
+
+    if (isPlanPurchased(planName)) {
+      return `Switch to ${planName}`;
+    }
+
+    return `Upgrade to ${planName}`;
+  };
+
+  const handlePlanSwitch = (plan) => {
     if (plan.name === currentPlan) {
       toast.info("You're already using this plan");
       return;
     }
 
-    const purchasedPlan = purchasedPlans.find((p) => p.plan === plan.name);
-    const isValidSubscription =
-      purchasedPlan && new Date(purchasedPlan.endDate) > new Date();
-
-    if (isValidSubscription) {
+    if (isPlanPurchased(plan.name)) {
       onPlanSwitch(plan);
     } else {
       setSelectedPlan(plan);
@@ -48,17 +49,17 @@ const PlanSwitcher = ({
     <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {availablePlans.map((plan) => {
+          const hasPlan = isPlanPurchased(plan.name);
+          const isCurrentPlan = currentPlan === plan.name;
           const purchasedPlan = purchasedPlans.find(
             (p) => p.plan === plan.name
           );
-          const isActive =
-            purchasedPlan && new Date(purchasedPlan.endDate) > new Date();
 
           return (
             <div
               key={plan.name}
               className={`p-4 rounded-lg border ${
-                currentPlan === plan.name
+                isCurrentPlan
                   ? "border-orange-500 bg-orange-50 dark:bg-orange-900/10"
                   : "border-gray-200 dark:border-gray-700"
               }`}
@@ -68,9 +69,9 @@ const PlanSwitcher = ({
                 {plan.description}
               </p>
               <p className="text-lg font-bold mb-2">{plan.price}</p>
-              {purchasedPlan && (
-                <p className="text-sm text-gray-500 mb-2">
-                  Expires:{" "}
+              {hasPlan && purchasedPlan && (
+                <p className="text-sm text-green-600 mb-2">
+                  Valid until:{" "}
                   {new Date(purchasedPlan.endDate).toLocaleDateString()}
                 </p>
               )}
@@ -86,9 +87,9 @@ const PlanSwitcher = ({
                 disabled={isLoading}
                 className={`mt-auto px-4 py-2 rounded-md w-full transition-colors
                   ${
-                    currentPlan === plan.name
+                    isCurrentPlan
                       ? "bg-orange-500 text-white"
-                      : isActive
+                      : hasPlan
                       ? "bg-green-500 text-white hover:bg-green-600"
                       : "bg-gray-200 hover:bg-orange-500 hover:text-white dark:bg-gray-700"
                   }

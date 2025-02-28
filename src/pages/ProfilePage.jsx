@@ -126,7 +126,7 @@ const ProfilePage = () => {
     }
   };
 
-  // Updated remove resume handler: also calls deleteFile to remove resume from S3
+  // Updated remove resume handler
   const handleRemoveResume = () => {
     setDialog({
       isOpen: true,
@@ -137,20 +137,22 @@ const ProfilePage = () => {
         try {
           if (resumePreview) {
             await deleteFile(resumePreview);
+            const userRef = doc(db, "users", userData.uid);
+            await updateDoc(userRef, {
+              resumeURL: "",
+            });
           }
-          const userRef = doc(db, "users", userData.uid);
-          await updateDoc(userRef, {
-            resumeURL: "",
-          });
           setResumeUpload(null);
           setResumePreview(null);
           setResumeFileName("");
+          setResumeFile(null);
           toast.success("Resume removed successfully!");
         } catch (error) {
           console.error("Error removing resume:", error);
           toast.error("Failed to remove resume");
+        } finally {
+          setDialog({ ...dialog, isOpen: false });
         }
-        setDialog({ ...dialog, isOpen: false });
       },
       type: "default",
     });
@@ -389,8 +391,9 @@ const ProfilePage = () => {
                     >
                       <FaCloudUploadAlt className="text-4xl mx-auto text-orange-500 mb-2" />
                       <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                        {resumeFileName ||
-                          "Drag & drop your resume here, or click to select"}
+                        {resumeFileName || resumePreview
+                          ? resumeFileName || "Current resume"
+                          : "Drag & drop your resume here, or click to select"}
                       </p>
                       <input
                         type="file"
@@ -400,6 +403,16 @@ const ProfilePage = () => {
                         onChange={handleResumeChange}
                       />
                     </div>
+                    {/* Add Remove Resume button if a resume exists */}
+                    {(resumeFileName || resumePreview) && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveResume}
+                        className="mt-2 w-full py-2 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+                      >
+                        Remove Resume
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex gap-4 mt-6">

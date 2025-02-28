@@ -56,15 +56,18 @@ const SubscriptionPage = () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      // Fetch user's subscription data
       const userRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
         if (userData.subscriptions) {
-          const activePlans = Object.values(userData.subscriptions)
-            .filter((sub) => sub.status === "active")
+          // Filter active subscriptions and check expiry dates
+          const activePlans = userData.subscriptions
+            .filter(
+              (sub) =>
+                sub.status === "active" && new Date(sub.endDate) > new Date()
+            )
             .map((sub) => ({
               plan: sub.plan,
               endDate: sub.endDate,
@@ -74,9 +77,15 @@ const SubscriptionPage = () => {
             }));
 
           setPurchasedPlans(activePlans);
-          // Set current plan to the most recent active subscription
-          if (activePlans.length > 0) {
-            setCurrentPlan(activePlans[0].plan);
+
+          // Set current plan only if it's still active
+          if (
+            userData.currentPlan &&
+            activePlans.some((plan) => plan.plan === userData.currentPlan)
+          ) {
+            setCurrentPlan(userData.currentPlan);
+          } else {
+            setCurrentPlan(null);
           }
         }
       }
@@ -92,15 +101,14 @@ const SubscriptionPage = () => {
   }, [user, showPayment]);
 
   const handlePlanSwitch = async (plan) => {
-    console.log("Handling plan switch:", plan.name);
-    console.log("Current purchased plans:", purchasedPlans);
+    const isPlanPurchased = purchasedPlans.some((p) => p.plan === plan.name);
 
-    if (!purchasedPlans.includes(plan.name)) {
-      console.log("Plan not purchased, showing payment modal");
-      setSelectedPlan(plan);
-      setShowPayment(true);
-    } else {
-      console.log("Switching to purchased plan:", plan.name);
+    if (plan.name === currentPlan) {
+      toast.info("You're already using this plan");
+      return;
+    }
+
+    if (isPlanPurchased) {
       try {
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
@@ -113,6 +121,9 @@ const SubscriptionPage = () => {
         console.error("Error switching plan:", error);
         toast.error("Failed to switch plan");
       }
+    } else {
+      setSelectedPlan(plan);
+      setShowPayment(true);
     }
   };
 

@@ -16,6 +16,8 @@ import {
   setDoc,
   serverTimestamp,
   updateDoc,
+  arrayUnion,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import PaymentStatus from "./PaymentStatus";
@@ -154,6 +156,45 @@ const PaymentPage = ({ isOpen, onClose, selectedPlan, onSuccess }) => {
     } else {
       // For failed payments, close the status modal but keep payment modal open
       setPaymentStatus(null);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userRef);
+
+      // Create new subscription object
+      const newSubscription = {
+        plan: selectedPlan.name,
+        price: selectedPlan.price,
+        features: selectedPlan.features,
+        status: "active",
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        subscriptionId: `sub_${Date.now()}`, // Generate unique subscription ID
+        purchasedAt: new Date().toISOString(),
+      };
+
+      // If subscriptions array doesn't exist, create it
+      if (!userDoc.data().subscriptions) {
+        await updateDoc(userRef, {
+          subscriptions: [newSubscription],
+          currentPlan: selectedPlan.name, // Set as current plan
+        });
+      } else {
+        // Add new subscription to existing array
+        await updateDoc(userRef, {
+          subscriptions: arrayUnion(newSubscription),
+          currentPlan: selectedPlan.name,
+        });
+      }
+
+      onSuccess(selectedPlan);
+      toast.success("Subscription purchased successfully!");
+    } catch (error) {
+      console.error("Error storing subscription:", error);
+      toast.error("Failed to store subscription details");
     }
   };
 

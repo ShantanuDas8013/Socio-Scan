@@ -165,23 +165,41 @@ const SettingsPage = () => {
     : null;
 
   const handleScanResume = async () => {
-    if (!resumeFileName) return;
+    if (!resumeFileName || !userData?.resumeURL) return;
     setIsAnalyzing(true);
 
     try {
-      // Fetch the resume file as Blob (adjust based on your file storage)
-      const responseFile = await fetch(userData.resumeURL);
-      const blob = await responseFile.blob();
-      const formData = new FormData();
-      formData.append("resume", blob, resumeFileName);
-
-      // Update the API endpoint port to 8000
-      const response = await fetch("http://localhost:8000/scan_resume", {
+      const requestData = {
         method: "POST",
-        body: formData,
-      });
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          resumeUrl: userData.resumeURL.trim(),
+        }),
+      };
+
+      console.log("Sending resume URL:", userData.resumeURL.trim());
+      const response = await fetch(
+        "http://localhost:8000/scan_resume",
+        requestData
+      );
 
       const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.detail || `HTTP error! status: ${response.status}`
+        );
+      }
+
+      if (
+        typeof result.overallScore === "undefined" ||
+        !result.categoryScores
+      ) {
+        throw new Error("Invalid response format from server");
+      }
+
       setResumeAnalysis({
         professionalismScore: Math.round(result.overallScore),
         education: result.categoryScores["Education"] > 50,
@@ -194,8 +212,14 @@ const SettingsPage = () => {
       setIsResumeDialogOpen(true);
     } catch (error) {
       console.error("Error scanning resume:", error);
+      alert(
+        `Failed to analyze resume: ${
+          error.message || "Unknown error"
+        }\nPlease ensure your resume URL is valid and accessible.`
+      );
+    } finally {
+      setIsAnalyzing(false);
     }
-    setIsAnalyzing(false);
   };
 
   const renderSubscriptionContent = () => (
