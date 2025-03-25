@@ -24,3 +24,13 @@ yarn-error.log
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Python virtual environments - specific paths
+venv/
+*/venv/
+server/venv/
+**/venv/**
+**/site-packages/**
+**/__pycache__/
+*.py[cod]
+*$py.class
