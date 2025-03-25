@@ -15,14 +15,16 @@ const HeroSection = () => {
         Fast, Ethical Resume screening for hiring decisions
       </p>
       <div className="flex justify-center my-10">
-        <a
+        {/* <a
           href="#"
           className="bg-gradient-to-r from-orange-500 to-orange-800 py-3 px-4 mx-3 rounded-md text-white"
         >
           Start for free
-        </a>
+        </a> */}
         <a
-          href="#"
+          href="https://github.com/ShantanuDas8013/Socio-Scan.git"
+          target="_blank"
+          rel="noopener noreferrer"
           className="py-3 px-4 mx-3 rounded-md border border-neutral-300 dark:border-neutral-700 dark:hover:border-neutral-600 hover:border-neutral-400 transition-colors"
         >
           Documentation

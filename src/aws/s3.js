@@ -8,11 +8,13 @@ import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3Client = new S3Client({
-  region: "ap-south-1", // updated region
-  endpoint: "https://s3.ap-south-1.amazonaws.com", // specify the correct endpoint
+  region: import.meta.env.VITE_AWS_REGION || "ap-south-1",
+  endpoint: `https://s3.${
+    import.meta.env.VITE_AWS_REGION || "ap-south-1"
+  }.amazonaws.com`,
   credentials: {
-    accessKeyId: "AKIA3CMCCDJWLV2BUTV3",
-    secretAccessKey: "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",
+    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
+    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
   },
 });
 
