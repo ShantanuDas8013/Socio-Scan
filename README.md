@@ -159,7 +159,7 @@ POST /api/parseResume
 
 Request body:
 
-```
+```bash
 {
   "resumeURL": "https://your-s3-bucket.com/path-to-resume.pdf"
 }
@@ -167,7 +167,7 @@ Request body:
 
 Response format:
 
-```
+```bash
 {
   "overallScore": 85,
   "categoryScores": {
