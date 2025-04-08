@@ -9,21 +9,35 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getFirebaseConfig } from "../utils/configLoader";
 
-// Directly use the Firebase config values
-// This approach is necessary when deployed to platforms like Railway
-const firebaseConfig = {
-  apiKey: "AIzaSyD2mvq7WrWu4u0TPk3g2bqPM3vVx6WZcWM",
-  authDomain: "socio-scan.firebaseapp.com",
-  projectId: "socio-scan",
-  storageBucket: "socio-scan.appspot.com",
-  messagingSenderId: "591183114585",
-  appId: "1:591183114585:web:b42c116a8c8ccc2d925c48",
-  measurementId: "G-GWFYWKPNEV",
-};
+// Get Firebase configuration from any available source
+const firebaseConfig = getFirebaseConfig();
 
-// Initialize Firebase with hardcoded config
-const app = initializeApp(firebaseConfig);
+// For debugging purposes - Remove in production
+console.log("Firebase initialization with config:", {
+  apiKey: firebaseConfig.apiKey ? "Set" : "Missing",
+  projectId: firebaseConfig.projectId,
+});
+
+// Initialize Firebase with the config
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log("Firebase initialized successfully");
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+  // Attempt to reinitialize with a delay if it failed
+  setTimeout(() => {
+    try {
+      app = initializeApp(firebaseConfig, "secondary-app");
+      console.log("Firebase reinitialized successfully with secondary name");
+    } catch (retryError) {
+      console.error("Firebase reinitialization also failed:", retryError);
+    }
+  }, 1000);
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 export const storage = getStorage(app);

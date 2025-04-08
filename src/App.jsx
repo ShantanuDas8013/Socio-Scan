@@ -18,6 +18,8 @@ import ApplicantLogin from "./pages/ApplicantLogin";
 import ApplicantSignup from "./pages/ApplicantSignup";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
+import { useEffect } from "react";
+import { testAuth, testFirestore } from "./utils/firebaseTest";
 
 const Home = () => {
   return (
@@ -78,6 +80,17 @@ const AppContent = () => {
 };
 
 const App = () => {
+  useEffect(() => {
+    // Test Firebase initialization on app startup
+    const runFirebaseTests = async () => {
+      const authOk = await testAuth();
+      const firestoreOk = await testFirestore();
+      console.log("Firebase tests:", { authOk, firestoreOk });
+    };
+
+    runFirebaseTests();
+  }, []);
+
   return (
     <Router>
       <ThemeProvider>
