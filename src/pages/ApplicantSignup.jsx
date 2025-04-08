@@ -5,7 +5,7 @@ import SimpleNavbar from "../components/SimpleNavbar";
 import { auth, db } from "../firebase/firebase"; // Fixed import path
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import spaceVideo from "../assets/space2.mp4"; // Add this import
+import spaceVideo from "../assets/Space.mp4"; // Changed from space2.mp4 to Space.mp4
 
 const ApplicantSignup = () => {
   const navigate = useNavigate();
