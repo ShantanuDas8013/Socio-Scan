@@ -9,3 +9,5 @@ window.RUNTIME_CONFIG = {
   FIREBASE_APP_ID: "1:591183114585:web:b42c116a8c8ccc2d925c48",
   FIREBASE_MEASUREMENT_ID: "G-GWFYWKPNEV",
 };
+
+console.log("Config.js loaded");
